@@ -61,7 +61,8 @@ group by 1,2
     SUM(IF(time_bucket IN ('Meeting'), sl.total_time, 0)) AS meeting_time,
     SUM(IF(time_bucket IN ('Follow Up'), sl.total_time, 0)) AS follow_up_time,
     SUM(IF(time_bucket IN ('Wrap Up (Break)'), sl.total_time, 0)) AS wrap_break_time,
-    SUM(IF(time_bucket IN ('Wrap Up (End of shift)'), sl.total_time, 0)) AS wrap_shift_end_time
+    SUM(IF(time_bucket IN ('Wrap Up (End of shift)'), sl.total_time, 0)) AS wrap_shift_end_time,
+    SUM(IF(time_bucket IS NULL, sl.total_time, 0)) AS null_status_time
   FROM (
     SELECT
       DATE(PARSE_TIMESTAMP("%m/%d/%Y %T", p.createddate)) event_date,
@@ -69,7 +70,7 @@ group by 1,2
       s.masterlabel AS time_bucket,
       CAST(p.statusduration AS FLOAT64) AS total_time
     FROM `tt-dp-prod.tack.user_service_presence` p
-    JOIN `tt-dp-prod.tack.service_presence_status` s
+    LEFT JOIN `tt-dp-prod.tack.service_presence_status` s
       ON s.id = p.servicepresencestatusid
     WHERE
       DATE(PARSE_TIMESTAMP("%m/%d/%Y %T", p.createddate)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 45 DAY) ) sl
@@ -153,6 +154,7 @@ SELECT
   COALESCE(lt.follow_up_time, 0) AS follow_up_time,
   COALESCE(lt.wrap_break_time, 0) AS wrap_break_time,
   COALESCE(lt.wrap_shift_end_time, 0) AS wrap_shift_end_time,
+  COALESCE(lt.null_status_time, 0) AS null_status_time,
   COALESCE(cl.csat_responses, 0) AS csat_responses,
   COALESCE(cl.csat_top2, 0) AS csat_top2,
   COALESCE(cl.csat_5, 0) AS csat_5,
@@ -222,6 +224,7 @@ SELECT
         follow_up_time,
         wrap_break_time,
         wrap_shift_end_time,
+        null_status_time,
         csat_responses,
         csat_top2,
         csat_5,
@@ -250,3 +253,4 @@ WHERE email_address = 'llmendoza@ttc.thumbtack.com'
 
 SELECT * FROM real_data
 UNION ALL SELECT * FROM fake_data
+ORDER BY index_date DESC, specialist_name
