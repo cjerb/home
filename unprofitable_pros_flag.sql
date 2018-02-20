@@ -42,7 +42,9 @@ SELECT
       AVG(IF(pay_per_customer_contact IS TRUE AND revenue > 0 AND first_intentful_ppc_contact_time IS NOT NULL, revenue,NULL)) AS avg_ppc_price_all_time,
       AVG(IF(pay_per_customer_contact IS FALSE AND revenue > 0, revenue,NULL)) AS avg_ppq_price_all_time,
       AVG(IF(DATE(sent_time) >= DATE_ADD(CURRENT_DATE(), INTERVAL -1 YEAR) AND pay_per_customer_contact IS TRUE AND revenue > 0 AND first_intentful_ppc_contact_time IS NOT NULL, revenue,NULL)) AS avg_ppc_price_last_year,
-      AVG(IF(DATE(sent_time) >= DATE_ADD(CURRENT_DATE(), INTERVAL -1 YEAR) AND pay_per_customer_contact IS FALSE AND revenue > 0, revenue,NULL)) AS avg_ppq_price_last_year
+      AVG(IF(DATE(sent_time) >= DATE_ADD(CURRENT_DATE(), INTERVAL -1 YEAR) AND pay_per_customer_contact IS FALSE AND revenue > 0, revenue,NULL)) AS avg_ppq_price_last_year,
+      60 AS cost_phone_support_contact,
+      30 AS cost_other_support_contact
 FROM a.quotes
 )
 
@@ -62,13 +64,13 @@ SELECT
         fqcp.avg_ppc_price_all_time,
         COALESCE((fqcp.avg_ppq_price_all_time * qcr.free_quotes_all_time + fqcp.avg_ppc_price_all_time * qcr.free_customer_contacts_all_time),0) AS est_free_all_time,
         
-        COALESCE(revenue_all_time,0) 
-            - COALESCE((60 * cases_phone_all_time + 30 * cases_other_all_time),0)  
+        COALESCE(qcr.revenue_all_time,0) 
+            - COALESCE((fqcp.cost_phone_support_contact * sc.cases_phone_all_time + fqcp.cost_other_support_contact * sc.cases_other_all_time),0)  
           AS profitability_all_time,
         
-        COALESCE(revenue_all_time,0)
-            + COALESCE((avg_ppq_price_all_time * free_quotes_all_time + avg_ppc_price_all_time * free_customer_contacts_all_time),0) 
-            - COALESCE((60 * cases_phone_all_time + 30 * cases_other_all_time),0) 
+        COALESCE(qcr.revenue_all_time,0)
+            + COALESCE((fqcp.avg_ppq_price_all_time * qcr.free_quotes_all_time + fqcp.avg_ppc_price_all_time * qcr.free_customer_contacts_all_time),0) 
+            - COALESCE((fqcp.cost_phone_support_contact * sc.cases_phone_all_time + fqcp.cost_other_support_contact * sc.cases_other_all_time),0) 
           AS profitability_incl_free_all_time,
         
         COALESCE(qcr.revenue_last_year,0) AS revenue_last_year,
@@ -81,21 +83,21 @@ SELECT
         COALESCE((fqcp.avg_ppq_price_last_year * qcr.free_quotes_last_year + fqcp.avg_ppc_price_last_year * qcr.free_customer_contacts_last_year),0) AS est_free_last_year,
 
         
-        COALESCE(revenue_last_year,0) 
-            - COALESCE((60 * cases_phone_last_year + 30 * cases_other_last_year),0)  
+        COALESCE(qcr.revenue_last_year,0) 
+            - COALESCE((fqcp.cost_phone_support_contact * sc.cases_phone_last_year + fqcp.cost_other_support_contact * sc.cases_other_last_year),0)  
           AS profitability_last_year,
         
-        COALESCE(revenue_last_year,0)
-            + COALESCE((avg_ppq_price_last_year * free_quotes_last_year + avg_ppc_price_last_year * free_customer_contacts_last_year),0) 
-            - COALESCE((60 * cases_phone_last_year + 30 * cases_other_last_year),0) 
+        COALESCE(qcr.revenue_last_year,0)
+            + COALESCE((fqcp.avg_ppq_price_last_year * qcr.free_quotes_last_year + fqcp.avg_ppc_price_last_year * qcr.free_customer_contacts_last_year),0) 
+            - COALESCE((fqcp.cost_phone_support_contact * sc.cases_phone_last_year + fqcp.cost_other_support_contact * sc.cases_other_last_year),0) 
           AS profitability_incl_free_last_year,
 
-        COALESCE((60 * cases_phone_all_time + 30 * cases_other_all_time),0) AS cost_all_time,
+        COALESCE((fqcp.cost_phone_support_contact * sc.cases_phone_all_time + fqcp.cost_other_support_contact * sc.cases_other_all_time),0) AS cost_all_time,
         COALESCE(sc.cases_all_time,0) AS cases_all_time,
         COALESCE(sc.cases_phone_all_time,0) AS cases_phone_all_time,
         COALESCE(sc.cases_other_all_time,0) AS cases_other_all_time,
 
-        COALESCE((60 * cases_phone_last_year + 30 * cases_other_last_year),0) AS cost_last_year,
+        COALESCE((fqcp.cost_phone_support_contact * sc.cases_phone_last_year + fqcp.cost_other_support_contact * sc.cases_other_last_year),0) AS cost_last_year,
         COALESCE(sc.cases_last_year,0) AS cases_last_year,
         COALESCE(sc.cases_phone_last_year,0) AS cases_phone_last_year,
         COALESCE(sc.cases_other_last_year,0) AS cases_other_last_year
@@ -107,9 +109,19 @@ LEFT JOIN support_cases sc ON p.pro_user_id = sc.user_id
 CROSS JOIN free_quote_contact_price fqcp
 )
 
-,temp AS (
 SELECT 
         prc.pro_user_id,
+        CASE WHEN SUBSTR(CAST(prc.pro_user_id AS STRING),-1) IN ('1') 
+              AND IF(DATE(prc.first_service_create_time) < DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH) AND seg.group_id NOT IN (1,2,3) AND prc.profitability_incl_free_all_time < 0, 1, 0) = 1 
+              THEN 1
+             WHEN SUBSTR(CAST(prc.pro_user_id AS STRING),-1) IN ('2','3','4') 
+              AND IF(DATE(prc.first_service_create_time) < DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH) AND seg.group_id NOT IN (1,2,3) AND prc.profitability_incl_free_all_time < 0, 1, 0) = 1
+              THEN 2
+             WHEN SUBSTR(CAST(prc.pro_user_id AS STRING),-1) IN ('5','6','7','8','9','0') 
+              AND IF(DATE(prc.first_service_create_time) < DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH) AND seg.group_id NOT IN (1,2,3) AND prc.profitability_incl_free_all_time < 0, 1, 0) = 1
+              THEN 3
+             ELSE 0
+             END AS unprofitable_rollout_wave,
         seg.group_id,
         IF(DATE(prc.first_service_create_time) < DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH) AND seg.group_id NOT IN (1,2,3) AND prc.profitability_all_time < 0, 1, 0) AS unprofitable_flag_all_time,
         IF(DATE(prc.first_service_create_time) < DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH) AND seg.group_id NOT IN (1,2,3) AND prc.profitability_last_year < 0, 1, 0) AS unprofitable_flag_last_year,
@@ -128,20 +140,3 @@ SELECT
         
 FROM revenue_profitability_cost_data prc
 LEFT JOIN ops.pro_user_estimate seg ON prc.pro_user_id = seg.pro_user_id
-)
-
-SELECT 
-        group_id, 
-        unprofitable_flag_all_time, 
-        unprofitable_flag_last_year, 
-        unprofitable_flag_incl_free_all_time, 
-        unprofitable_flag_incl_free_last_year,
-        COUNT(1),
-        AVG(profitability_all_time), 
-        AVG(profitability_last_year), 
-        AVG(profitability_incl_free_all_time), 
-        AVG(profitability_incl_free_last_year)
-        
-FROM temp
-GROUP BY 1,2,3,4,5
-ORDER BY 1,2,3,4,5
