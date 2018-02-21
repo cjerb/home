@@ -33,7 +33,7 @@ SELECT
         
 FROM agents a 
 JOIN `tt-dp-prod.ops.cases` c ON a.salesforce_id_18 = c.case_owner_agent_id AND DATE(PARSE_TIMESTAMP("%Y-%m-%d %T", closed_time_mt)) BETWEEN a.date_team_start AND a.date_team_end
-WHERE (DATE(PARSE_TIMESTAMP("%Y-%m-%d %T", c.created_time_mt)) >= DATE_SUB(CURRENT_DATE(),INTERVAL 45 DAY) OR  DATE(PARSE_TIMESTAMP("%Y-%m-%d %T", c.closed_time_mt)) >= DATE_SUB(CURRENT_DATE(),INTERVAL 45 DAY))
+WHERE (DATE(PARSE_TIMESTAMP("%Y-%m-%d %T", c.created_time_mt)) >= DATE_SUB(CURRENT_DATE(),INTERVAL 120 DAY) OR  DATE(PARSE_TIMESTAMP("%Y-%m-%d %T", c.closed_time_mt)) >= DATE_SUB(CURRENT_DATE(),INTERVAL 120 DAY))
   AND first_contact_channel IN ('Phone','Email','Chat','SMS','Directly Question','In-Product')
   AND auto_response IS FALSE
   AND duplicate_case_id IS NULL
@@ -87,9 +87,9 @@ JOIN
                ELSE 'Other - Unavailable'
           END AS time_bucket
    FROM `tt-dp-prod.ops.agent_status_log` 
-   WHERE EXTRACT(DATE FROM event_time AT TIME ZONE "America/Denver") >= DATE_SUB(CURRENT_DATE(),INTERVAL 45 DAY)
+   WHERE EXTRACT(DATE FROM event_time AT TIME ZONE "America/Denver") >= DATE_SUB(CURRENT_DATE(),INTERVAL 120 DAY)
   
-  ) sl ON a.liveops = sl.agent_id AND EXTRACT(DATE FROM event_time AT TIME ZONE "America/Denver") BETWEEN a.date_team_start AND a.date_team_end
+  ) sl ON a.email_address = SPLIT(sl.agent_system_name," ")[ORDINAL(1)] AND EXTRACT(DATE FROM event_time AT TIME ZONE "America/Denver") BETWEEN a.date_team_start AND a.date_team_end
   
 GROUP BY 1,2,3,4,5,6,7,8,9,10
 ORDER BY 1,10
@@ -166,7 +166,7 @@ ORDER BY 1,10
 SELECT
       *
 FROM agents,
-UNNEST(GENERATE_DATE_ARRAY(DATE_SUB(CURRENT_DATE(),INTERVAL 45 DAY), CURRENT_DATE())) AS index_date
+UNNEST(GENERATE_DATE_ARRAY(DATE_SUB(CURRENT_DATE(),INTERVAL 120 DAY), CURRENT_DATE())) AS index_date
 WHERE index_date BETWEEN date_team_start AND date_team_end
 ORDER BY specialist_name, index_date
 )
