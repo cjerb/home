@@ -1,3 +1,4 @@
+#standardsql
 WITH agents AS (
 
 SELECT 
@@ -75,7 +76,10 @@ FROM agents a
 JOIN 
   (SELECT 
           *,
-             CASE WHEN agent_presence_state = 'BUSY' AND agent_state_modifier = 'None' AND unavailable_reason IS NULL THEN 'Talk'
+          CASE WHEN agent_system_name = 'sbennett@thumbtack.co' THEN 'sbennett@thumbtack.com'
+               ELSE SPLIT(agent_system_name," ")[ORDINAL(1)]
+               END AS liveops_system_name_email,
+          CASE WHEN agent_presence_state = 'BUSY' AND agent_state_modifier = 'None' AND unavailable_reason IS NULL THEN 'Talk'
                WHEN agent_state_modifier IN ('WrapUp','Paused','WrapUp+Hold','WrapUp+Pinned') OR unavailable_reason = 'Logged On as Unavailable' THEN 'Wrap'
                WHEN agent_state_modifier IN ('Hold','Hold+Pinned') THEN 'Hold'
                WHEN agent_presence_state IN ('IDLE') AND work_type IN ('Inbound') THEN 'Idle'
@@ -89,7 +93,7 @@ JOIN
    FROM `tt-dp-prod.ops.agent_status_log` 
    WHERE EXTRACT(DATE FROM event_time AT TIME ZONE "America/Denver") >= DATE_SUB(CURRENT_DATE(),INTERVAL 120 DAY)
   
-  ) sl ON a.email_address = SPLIT(sl.agent_system_name," ")[ORDINAL(1)] AND EXTRACT(DATE FROM event_time AT TIME ZONE "America/Denver") BETWEEN a.date_team_start AND a.date_team_end
+  ) sl ON a.email_address = sl.liveops_system_name_email AND EXTRACT(DATE FROM event_time AT TIME ZONE "America/Denver") BETWEEN a.date_team_start AND a.date_team_end
   
 GROUP BY 1,2,3,4,5,6,7,8,9,10
 ORDER BY 1,10
