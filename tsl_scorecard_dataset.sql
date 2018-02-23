@@ -76,7 +76,7 @@ FROM agents a
 JOIN 
   (SELECT 
           *,
-          CASE WHEN agent_system_name = 'sbennett@thumbtack.co' THEN 'sbennett@thumbtack.com'
+          CASE WHEN SPLIT(agent_system_name," ")[ORDINAL(1)] = 'sbennett@thumbtack.co' THEN 'sbennett@thumbtack.com'
                ELSE SPLIT(agent_system_name," ")[ORDINAL(1)]
                END AS liveops_system_name_email,
           CASE WHEN agent_presence_state = 'BUSY' AND agent_state_modifier = 'None' AND unavailable_reason IS NULL THEN 'Talk'
