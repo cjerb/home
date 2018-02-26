@@ -4,7 +4,7 @@ WITH visitors AS (
 SELECT
   DATE_ADD(DATE_TRUNC(DATE_SUB(visit_date, INTERVAL 1 DAY), WEEK), INTERVAL 1 DAY) AS week,
   COUNT(DISTINCT visitor_pk)/10000 AS visitors
-FROM a.customer_visits
+FROM `tt-dp-prod.a.customer_visits`
 WHERE ip_sessions < 100
   AND _PARTITIONTIME >= '2017-01-01'
 GROUP BY 1 
@@ -15,7 +15,7 @@ ORDER BY 1 DESC
 SELECT 
   DATE_ADD(DATE_TRUNC(DATE_SUB(DATE(create_time), INTERVAL 1 DAY), WEEK), INTERVAL 1 DAY) AS week,
   COUNT(request_id) AS requests
-FROM a.requests 
+FROM `tt-dp-prod.a.requests` 
 WHERE create_time >= '2017-01-01'
 GROUP BY 1
 ORDER BY 1 DESC
@@ -25,7 +25,7 @@ ORDER BY 1 DESC
 SELECT
   DATE_ADD(DATE_TRUNC(DATE_SUB(DATE(first_customer_contact_time), INTERVAL 1 DAY), WEEK), INTERVAL 1 DAY) AS week,
   COUNT(bid_id) AS contacts
-FROM a.contacts 
+FROM `tt-dp-prod.a.contacts` 
 WHERE first_customer_contact_time >= '2017-01-01'
 GROUP BY 1
 ORDER BY 1 DESC
@@ -43,7 +43,7 @@ SELECT
         COUNT(IF(first_contact_channel = 'Directly Question',1,NULL)) AS cases_directly,
         COUNT(IF(first_contact_channel = 'In-Product',1,NULL)) AS cases_in_product
 
-FROM ops.cases
+FROM `tt-dp-prod.ops.cases`
 WHERE COALESCE(case_category,' ') NOT IN ('Marketplace Integrity') 
       AND first_contact_channel IN ('Chat','Email','Phone','SMS','Directly Question','In-Product')
       AND created_time >= '2017-01-01'
@@ -69,7 +69,7 @@ SELECT
         SAFE_DIVIDE(COUNT(IF(pro_segment_group_id = 4 AND likely_continue_using_score IN (4,5),1,NULL)) , COUNT(IF(pro_segment_group_id = 4, likely_continue_using_score,NULL))) AS ltc_occasional,
         SAFE_DIVIDE(COUNT(IF(pro_segment_group_id IS NULL AND likely_continue_using_score IN (4,5),1,NULL)) , COUNT(IF(pro_segment_group_id IS NULL , likely_continue_using_score,NULL))) AS ltc_unknown
 
-FROM ops.cases
+FROM `tt-dp-prod.ops.cases`
 WHERE COALESCE(case_category,' ') NOT IN ('Marketplace Integrity') 
       AND COALESCE(first_contact_channel,'') IN ('Chat','Email','Phone','SMS','Directly Question','In-Product')
       AND csat_response_time >= '2017-06-01'
@@ -151,7 +151,12 @@ SELECT
         cph.cph,
         cph.cph_tsl,
         cph.cph_ibex,
-        cph.cph_tph
+        cph.cph_tph,
+        
+        COALESCE(sc.tsl_costs,0) + COALESCE(sc.ibex_costs,0) + COALESCE(sc.tph_costs,0) AS total_costs,
+        sc.tsl_costs,
+        sc.ibex_costs,
+        sc.tph_costs
         
 FROM visitors v
 LEFT JOIN requests r ON v.week = r.week
@@ -159,5 +164,6 @@ LEFT JOIN contacts cc ON v.week = cc.week
 LEFT JOIN cases c ON v.week = c.week
 LEFT JOIN ltc l ON v.week = l.week
 LEFT JOIN cases_per_hour cph ON v.week = cph.week
+LEFT JOIN `tt-dp-prod.sandbox.jerb_support_costs` sc ON v.week = sc.week
 WHERE v.week >= '2017-01-01' AND v.week < DATE_TRUNC(CURRENT_DATE(), WEEK(MONDAY))
 ORDER BY 1
