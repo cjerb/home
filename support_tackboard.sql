@@ -115,7 +115,12 @@ SELECT
         SAFE_DIVIDE(SUM(closed_cases), SUM(hours_worked)) AS cph,
         SAFE_DIVIDE(SUM(IF(team_name = 'TSL Phone',closed_cases,0)), SUM(IF(team_name = 'TSL Phone',hours_worked,0))) AS cph_tsl,
         SAFE_DIVIDE(SUM(IF(team_name = 'IBEX',closed_cases,0)), SUM(IF(team_name = 'IBEX',hours_worked,0))) AS cph_ibex,
-        SAFE_DIVIDE(SUM(IF(team_name IN ('TPH Chat','TPH SMS','TPH Email'),closed_cases,0)), SUM(IF(team_name IN ('TPH Chat','TPH SMS','TPH Email'),hours_worked,0))) AS cph_tph
+        SAFE_DIVIDE(SUM(IF(team_name IN ('TPH Chat','TPH SMS','TPH Email'),closed_cases,0)), SUM(IF(team_name IN ('TPH Chat','TPH SMS','TPH Email'),hours_worked,0))) AS cph_tph,
+        
+        COALESCE(SUM(closed_cases),0) AS cases_total_team,
+        SUM(IF(team_name = 'TSL Phone',closed_cases,0)) AS cases_tsl,
+        SUM(IF(team_name = 'IBEX',closed_cases,0)) AS cases_ibex,
+        SUM(IF(team_name IN ('TPH Chat','TPH SMS','TPH Email'),closed_cases,0)) AS cases_tph
 
 FROM combined
 GROUP BY 1
@@ -135,6 +140,12 @@ SELECT
         c.cases_auto_response,
         c.cases_directly,
         c.cases_in_product,
+        
+        cph.cases_total_team,
+        cph.cases_tsl,
+        cph.cases_ibex,
+        cph.cases_tph,
+        
         l.ltc_surveys,
         l.ltc,
         l.ltc_phone,
@@ -148,6 +159,7 @@ SELECT
         l.ltc_hvp_potential,
         l.ltc_occasional,
         l.ltc_unknown,
+        
         cph.cph,
         cph.cph_tsl,
         cph.cph_ibex,
