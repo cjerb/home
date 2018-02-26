@@ -129,8 +129,8 @@ ORDER BY 1 DESC
 
 SELECT 
         v.week,
-        v.visitors,
-        r.requests,
+        v.visitors_10k,
+        r.requests_100,
         cc.contacts,
         c.cases,
         c.cases_phone,
