@@ -3,7 +3,7 @@
 WITH visitors AS (
 SELECT
   DATE_ADD(DATE_TRUNC(DATE_SUB(visit_date, INTERVAL 1 DAY), WEEK), INTERVAL 1 DAY) AS week,
-  COUNT(DISTINCT visitor_pk)/10000 AS visitors
+  COUNT(DISTINCT visitor_pk)/10000 AS visitors_10k
 FROM `tt-dp-prod.a.customer_visits`
 WHERE ip_sessions < 100
   AND _PARTITIONTIME >= '2017-01-01'
@@ -14,7 +14,7 @@ ORDER BY 1 DESC
 , requests AS (
 SELECT 
   DATE_ADD(DATE_TRUNC(DATE_SUB(DATE(create_time), INTERVAL 1 DAY), WEEK), INTERVAL 1 DAY) AS week,
-  COUNT(request_id) AS requests
+  COUNT(request_id)/100 AS requests_100
 FROM `tt-dp-prod.a.requests` 
 WHERE create_time >= '2017-01-01'
 GROUP BY 1
